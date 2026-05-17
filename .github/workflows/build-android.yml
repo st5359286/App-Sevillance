@@ -36,15 +36,14 @@ jobs:
       working-directory: ./android
       run: |
         chmod +x ./gradlew
-        ./gradlew assembleRelease > gradle-build.log 2>&1 || true
+        ./gradlew assembleRelease > gradle-build.log 2>&1
 
-    - name: Commit Build Log
-      run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "github-actions@github.com"
-        git add android/gradle-build.log
-        git commit -m "Add build log" || true
-        git push origin main
+    - name: Upload Build Log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: gradle-build-log
+        path: android/gradle-build.log
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
