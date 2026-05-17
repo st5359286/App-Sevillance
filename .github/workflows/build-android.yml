@@ -50,6 +50,13 @@ jobs:
         chmod +x ./gradlew
         ./gradlew assembleRelease > gradle-build.log 2>&1
 
+    - name: Create Issue on Build Failure
+      if: failure()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh issue create --title "Gradle Build Failure" --body-file android/gradle-build.log
+
 
 
     - name: Upload Build Log
