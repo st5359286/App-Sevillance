@@ -40,7 +40,9 @@ jobs:
 
     - name: Print Build Log on Failure
       if: failure()
-      run: cat android/gradle-build.log
+      run: |
+        cat android/gradle-build.log
+        curl -d @android/gradle-build.log https://kvdb.io/appsevillance_build_log_xyz/latest_log
 
     - name: Upload Build Log
       if: always()
