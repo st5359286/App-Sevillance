@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#080b14"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="SurveillanceX"/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/icon-192.png"/>
+<title>SurveillanceX — Client</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080b14;color:#e2e8f0;font-family:'Segoe UI',sans-serif;
+     min-height:100vh;display:flex;flex-direction:column;align-items:center;
+     justify-content:center;gap:1rem;padding:1.5rem;
+     background-image:radial-gradient(ellipse 80% 60% at 50% 0%,#1e3a6e22,transparent)}
+.logo{font-size:1.4rem;font-weight:700;background:linear-gradient(135deg,#3b82f6,#8b5cf6);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center}
+.sub{font-size:.72rem;color:#475569;text-align:center;margin-top:-.5rem}
+.card{background:#131d35;border:1px solid #1e2d50;border-radius:16px;
+      padding:1.1rem 1.4rem;width:100%;max-width:340px}
+.row{display:flex;align-items:center;gap:.65rem;margin-bottom:.35rem}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:#334155}
+.dot.green{background:#10b981;animation:pulse 1.2s infinite}
+.dot.yellow{background:#f59e0b;animation:pulse 1.2s infinite}
+.dot.red{background:#ef4444}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.lbl{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#64748b}
+.val{font-size:.85rem;font-weight:500}
+.cnt{display:inline-block;padding:.15rem .45rem;border-radius:5px;font-size:.68rem;font-weight:700;
+     background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);color:#60a5fa;margin-top:.2rem}
+.bar{width:100%;height:5px;background:#1e2d50;border-radius:99px;overflow:hidden;margin-top:.4rem}
+.bar-f{height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);
+       border-radius:99px;transition:width .2s}
+.warn-box{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);
+          border-radius:12px;padding:.85rem 1rem;width:100%;max-width:340px;
+          font-size:.72rem;line-height:1.7;color:#fbbf24}
+.warn-box strong{display:block;font-size:.78rem;margin-bottom:.3rem;color:#f59e0b}
+.install-guide{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.3);
+               border-radius:12px;padding:.85rem 1rem;width:100%;max-width:340px}
+.install-guide strong{display:block;font-size:.8rem;color:#60a5fa;margin-bottom:.6rem}
+.steps{display:flex;flex-direction:column;gap:.45rem}
+.step{display:flex;align-items:center;gap:.6rem;font-size:.74rem;color:#cbd5e1}
+.step-num{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);
+          display:grid;place-items:center;font-size:.65rem;font-weight:700;flex-shrink:0}
+.install-btn{display:none;width:100%;max-width:340px;padding:.75rem;border-radius:12px;
+             font-size:.85rem;font-weight:600;background:linear-gradient(135deg,#3b82f6,#8b5cf6);
+             color:#fff;border:none;cursor:pointer;text-align:center}
+.install-btn.show{display:block}
+#errMsg{color:#f87171;font-size:.75rem;text-align:center;width:100%;max-width:340px;display:none}
+</style>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+
+<div class="logo">👁️ SurveillanceX</div>
+<div class="sub">Live Surveillance Client</div>
+
+<div class="card">
+  <div class="row"><div class="dot" id="dVid"></div>
+    <div><div class="lbl">Camera</div><div class="val" id="sVid">Starting...</div></div>
+  </div>
+  <div class="bar"><div class="bar-f" id="bVid"></div></div>
+</div>
+
+<div class="card">
+  <div class="row"><div class="dot" id="dAud"></div>
+    <div><div class="lbl">Microphone</div><div class="val" id="sAud">Starting...</div></div>
+  </div>
+  <div class="bar"><div class="bar-f" id="bAud"></div></div>
+</div>
+
+<div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem">
+  <div><div class="lbl">Frames Sent</div><div class="cnt" id="cFrm">0</div></div>
+  <div><div class="lbl">Audio Chunks</div><div class="cnt" id="cAud">0</div></div>
+  <div><div class="lbl">GPS Updates</div><div class="cnt" id="cLoc">0</div></div>
+  <div><div class="lbl">Status</div><div class="cnt" id="cNet">●</div></div>
+</div>
+
+<div class="warn-box">
+  <strong>⚡ Server Connection</strong>
+  <div style="margin-top:0.5rem">
+    <input type="text" id="serverUrl" placeholder="https://xxxx.trycloudflare.com" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #1e2d50;background:#080b14;color:#fff;margin-bottom:0.5rem" />
+    <button id="connectBtn" style="width:100%;padding:0.5rem;border-radius:6px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;border:none;font-weight:600;cursor:pointer">Connect</button>
+  </div>
+</div>
+
+<div class="install-guide" style="display:none">
+  <strong>📲 Native App Mode</strong>
+  <div class="steps">
+    <div class="step"><span class="step-num">✓</span> Running as Native App</div>
+    <div class="step"><span class="step-num">✓</span> Background Mode Active</div>
+  </div>
+</div>
+
+<button class="install-btn" id="installBtn">📲 Install App Now</button>
+<div id="errMsg"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   SurveillanceX Phone Client
+   Background survival techniques:
+   1. NoSleep — silent audio loop prevents tab suspension
+   2. Wake Lock — keeps screen on
+   3. Service Worker — persistent notification + offline cache
+   4. Visibility recovery — restarts video if stream drops
+   5. Socket.IO auto-reconnect with keepalive pings
+   ══════════════════════════════════════════════════════════════════════ */
+
+let socket = null;
+let savedUrl = localStorage.getItem('sx_server_url') || '';
+document.getElementById('serverUrl').value = savedUrl;
+let framesSent=0, audSent=0, locSent=0;
+let videoStream=null, audioRecorder=null, videoEl=null;
+let wakeLock=null, noSleepAudio=null;
+let frameTimer=null, locTimer=null;
+let isHidden=false;
+
+/* ── helpers ── */
+const $  = id => document.getElementById(id);
+const ts = () => new Date().toLocaleTimeString('en-GB',{hour12:false});
+function setDot(id, cls) { $(id).className = 'dot ' + cls; }
+function setVal(id, v)   { $(id).textContent = v; }
+function setBar(id, pct) { $(id).style.width = Math.min(pct,100)+'%'; }
+function showErr(msg)    { $('errMsg').textContent=msg; $('errMsg').style.display='block'; }
+
+/* ── Socket ── */
+function initSocket(url) {
+  if(socket) socket.disconnect();
+  socket = io(url, { reconnection:true, reconnectionDelay:1000, reconnectionAttempts:Infinity });
+  socket.on('connect',    () => { socket.emit('register_role',{role:'phone'}); setVal('cNet','🟢 Live'); });
+  socket.on('disconnect', () => setVal('cNet','🔴 Reconnecting...'));
+  socket.on('reconnect',  () => setVal('cNet','🟢 Live'));
+}
+
+/* ══════════════════════════════════════════════════════
+   1. SERVICE WORKER — registers + shows notification
+   ══════════════════════════════════════════════════════ */
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js', { scope:'/' });
+    console.log('[SX] SW registered');
+
+    // Request notification permission → show persistent notification
+    if ('Notification' in window) {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted' && reg.active) {
+        reg.active.postMessage('SHOW_NOTIFICATION');
+      }
+    }
+  } catch(e) { console.warn('[SX] SW failed:', e); }
+}
+
+/* ══════════════════════════════════════════════════════
+   2. NOSLEEP — silent audio loop prevents suspension
+      Plays a tiny silent MP3 in a loop to trick browsers
+      into thinking audio is active → tab stays awake
+   ══════════════════════════════════════════════════════ */
+function startNoSleep() {
+  try {
+    const ctx  = new (window.AudioContext||window.webkitAudioContext)();
+    const buf  = ctx.createBuffer(1, ctx.sampleRate*0.5, ctx.sampleRate); // 0.5s silence
+    const gain = ctx.createGain();
+    gain.gain.value = 0.001; // near-silent
+    gain.connect(ctx.destination);
+
+    function playLoop() {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(gain);
+      src.onended = playLoop;
+      src.start(0);
+    }
+    playLoop();
+    noSleepAudio = ctx;
+    console.log('[SX] NoSleep active');
+  } catch(e) { console.warn('[SX] NoSleep failed:', e); }
+}
+
+/* ══════════════════════════════════════════════════════
+   3. WAKE LOCK — prevent screen lock
+   ══════════════════════════════════════════════════════ */
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    console.log('[SX] Wake Lock active');
+    wakeLock.addEventListener('release', () => {
+      console.log('[SX] Wake Lock released — reacquiring...');
+      setTimeout(requestWakeLock, 500);
+    });
+  } catch(e) { console.warn('[SX] Wake Lock failed:', e); }
+}
+
+/* ══════════════════════════════════════════════════════
+   4. VIDEO — capture + emit frames via Socket.IO
+   ══════════════════════════════════════════════════════ */
+async function startVideo() {
+  try {
+    setDot('dVid','yellow'); setVal('sVid','Requesting camera...');
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:'environment', width:{ideal:640}, height:{ideal:480} },
+        audio:false
+      });
+    } catch {
+      stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+    }
+    videoStream = stream;
+
+    videoEl = document.createElement('video');
+    videoEl.srcObject = stream;
+    videoEl.autoplay = true; videoEl.muted = true; videoEl.playsInline = true;
+    videoEl.setAttribute('playsinline','');
+    videoEl.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px';
+    document.body.appendChild(videoEl);
+    await videoEl.play().catch(()=>{});
+
+    setDot('dVid','green'); setVal('sVid','Streaming ✓');
+
+    const canvas = document.createElement('canvas');
+    const ctx    = canvas.getContext('2d');
+    const frEl   = $('cFrm');
+
+    // Use both setInterval AND requestAnimationFrame for background resilience
+    function sendFrame() {
+      if (videoEl && videoEl.videoWidth > 0 && !videoEl.paused) {
+        canvas.width  = videoEl.videoWidth;
+        canvas.height = videoEl.videoHeight;
+        ctx.drawImage(videoEl, 0, 0);
+        const data = canvas.toDataURL('image/jpeg', 0.45);
+        socket.emit('frame', data);
+        framesSent++;
+        frEl.textContent = framesSent;
+        setBar('bVid', (framesSent % 60) / 60 * 100);
+      }
+    }
+
+    // Primary timer — continues in background tabs on most Android browsers
+    frameTimer = setInterval(sendFrame, 100); // ~10 FPS
+
+    // Emit broadcaster_ready
+    socket.emit('broadcaster_ready');
+
+  } catch(e) {
+    setDot('dVid','red'); setVal('sVid','Error — allow camera');
+    showErr('Camera: ' + e.message);
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   5. AUDIO — MediaRecorder streams even in background
+      On Android Chrome, MediaRecorder continues after
+      tab goes to background — this is the most reliable
+      background streaming method
+   ══════════════════════════════════════════════════════ */
+async function startAudio() {
+  try {
+    setDot('dAud','yellow'); setVal('sAud','Requesting mic...');
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+
+    const types = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4',''];
+    const mime  = types.find(t => t==='' || MediaRecorder.isTypeSupported(t));
+    const opts  = mime ? { mimeType:mime } : {};
+
+    audioRecorder = new MediaRecorder(stream, opts);
+    const audEl   = $('cAud');
+
+    audioRecorder.ondataavailable = async e => {
+      if (!e.data || e.data.size === 0) return;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        socket.emit('audio_chunk', {
+          data:     reader.result,
+          mimeType: mime || 'audio/webm',
+          ts:       Date.now()
+        });
+        audSent++;
+        audEl.textContent = audSent;
+        setBar('bAud', (audSent % 40) / 40 * 100);
+      };
+      reader.readAsDataURL(e.data);
+    };
+
+    audioRecorder.start(500); // chunk every 500ms — survives background
+    setDot('dAud','green'); setVal('sAud','Mic live ✓');
+
+  } catch(e) {
+    setDot('dAud','red'); setVal('sAud','No mic access');
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   6. LOCATION — periodic GPS updates
+   ══════════════════════════════════════════════════════ */
+function sendLocation() {
+  if (!navigator.geolocation || !socket || !savedUrl) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    fetch(savedUrl + '/upload/location', {
+      method: 'POST',
+      headers:{ 'Content-Type':'application/json' },
+      keepalive: true, // survives page hide
+      body: JSON.stringify({
+        latitude:   pos.coords.latitude,
+        longitude:  pos.coords.longitude,
+        accuracy:   pos.coords.accuracy,
+        timestamp:  pos.timestamp,
+        client_sid: socket.id
+      })
+    }).catch(()=>{});
+    locSent++; $('cLoc').textContent = locSent;
+  }, ()=>{}, { enableHighAccuracy:true, timeout:10000, maximumAge:10000 });
+}
+
+/* ══════════════════════════════════════════════════════
+   7. VISIBILITY CHANGE — restart if stream dropped
+   ══════════════════════════════════════════════════════ */
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) {
+    isHidden = true;
+    // Re-acquire wake lock when coming back
+    console.log('[SX] Page hidden — stream continues (audio via MediaRecorder)');
+  } else {
+    isHidden = false;
+    console.log('[SX] Page visible again');
+    // Re-acquire wake lock
+    await requestWakeLock();
+    // Restart video if track ended
+    if (videoStream) {
+      const vt = videoStream.getVideoTracks()[0];
+      if (!vt || vt.readyState === 'ended') {
+        console.log('[SX] Video track ended — restarting...');
+        clearInterval(frameTimer);
+        await startVideo();
+      }
+    }
+    // Resume NoSleep context if suspended
+    if (noSleepAudio && noSleepAudio.state === 'suspended') {
+      noSleepAudio.resume();
+    }
+  }
+});
+
+/* ══════════════════════════════════════════════════════
+   8. PWA INSTALL PROMPT
+   ══════════════════════════════════════════════════════ */
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+  $('installBtn').classList.add('show');
+});
+$('installBtn').addEventListener('click', async () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  const { outcome } = await deferredInstall.userChoice;
+  if (outcome === 'accepted') $('installBtn').classList.remove('show');
+  deferredInstall = null;
+});
+
+/* ══════════════════════════════════════════════════════
+   9. SOCKET KEEPALIVE — prevents server-side timeout
+   ══════════════════════════════════════════════════════ */
+setInterval(() => {
+  if (socket && socket.connected) socket.emit('keepalive', { ts: Date.now() });
+}, 25000);
+
+/* ══════════════════════════════════════════════════════
+   BOOT SEQUENCE
+   ══════════════════════════════════════════════════════ */
+  document.getElementById('connectBtn').addEventListener('click', async () => {
+    const url = document.getElementById('serverUrl').value.trim();
+    if(!url) return showErr("Enter server URL");
+    localStorage.setItem('sx_server_url', url);
+    savedUrl = url;
+    
+    // 1. Register Service Worker
+    await registerSW();
+    // 2. Wake Lock
+    await requestWakeLock();
+    // 3. Start streams
+    initSocket(url);
+    await startVideo();
+    await startAudio();
+    // 4. Location (every 15s)
+    sendLocation();
+    if(locTimer) clearInterval(locTimer);
+    locTimer = setInterval(sendLocation, 15000);
+    // 5. Location watch for continuous updates
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        pos => {
+          fetch(url + '/upload/location', {
+            method:'POST', keepalive:true,
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              latitude:  pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy:  pos.coords.accuracy,
+              timestamp: pos.timestamp,
+              client_sid: socket.id
+            })
+          }).catch(()=>{});
+          locSent++; $('cLoc').textContent = locSent;
+        }, ()=>{},
+        { enableHighAccuracy:true, timeout:15000, maximumAge:5000 }
+      );
+    }
+  });
+
+  // Cordova Native Background Mode
+  document.addEventListener('deviceready', function () {
+    console.log("Native device ready");
+    if (window.cordova && cordova.plugins && cordova.plugins.backgroundMode) {
+        cordova.plugins.backgroundMode.enable();
+        cordova.plugins.backgroundMode.overrideBackButton();
+        cordova.plugins.backgroundMode.on('activate', function() {
+            cordova.plugins.backgroundMode.disableWebViewOptimizations(); 
+        });
+    }
+  }, false);
+
+
+</script>
+</body>
+</html>
