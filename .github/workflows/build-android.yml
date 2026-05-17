@@ -38,6 +38,10 @@ jobs:
         chmod +x ./gradlew
         ./gradlew assembleRelease > gradle-build.log 2>&1
 
+    - name: Print Build Log on Failure
+      if: failure()
+      run: cat android/gradle-build.log
+
     - name: Upload Build Log
       if: always()
       uses: actions/upload-artifact@v4
